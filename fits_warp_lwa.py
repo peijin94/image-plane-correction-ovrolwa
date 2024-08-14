@@ -41,6 +41,10 @@ def identify_sources_bdsf(img, imwcs, min_flux=2.7):
         "filename": img,
         "outdir": WORKING_DIR,
         "ncores": CPU_COUNT,
+        "mean_map": "const",
+        "thresh": "hard",
+        "thresh_isl": 100,
+        "thresh_pix": 5,
     }
     savefile = f"{WORKING_DIR}/{SAVEFILE_NAME}"
     with open(savefile, 'wb') as f:
@@ -70,7 +74,7 @@ def identify_sources_bdsf(img, imwcs, min_flux=2.7):
 # Returns the coordinates of sources in the reference catalog with at least the minimum flux (in mJy)
 # The default value is 270 mJy since the NVSS catalog was observed at 1.4 GHz, the LWA testing images
 # were taken at ~60 MHz with a lower-bound of ~2.7 Jy, and we assume a spectral index of -0.7.
-def reference_sources_nvss(min_flux=270):
+def reference_sources_nvss(min_flux=270, with_flux=False):
     nvss = pd.read_csv("nvss_trim.dat", sep='\s+')
     sorted_nvss = nvss.sort_values(by=['f'])
     
@@ -79,6 +83,9 @@ def reference_sources_nvss(min_flux=270):
 
     # get coordinates of each reference source
     nvss_orig = sorted_nvss[["rah", "ram", "ras", "dd", "dm", "ds"]].iloc[:].to_numpy()
+
+    # get flux of each reference source in Jy
+    fluxes = sorted_nvss[["f"]].iloc[:].to_numpy().squeeze() / 1000
     
     # manually convert HMS:DMS into degrees
     nvss_ra = 15 * nvss_orig[:, 0] + (15 / 60) * nvss_orig[:, 1] + (15 / 3600) * nvss_orig[:, 2]
@@ -86,7 +93,10 @@ def reference_sources_nvss(min_flux=270):
     
     positions = np.stack((nvss_ra, nvss_dec), axis=-1)
     
-    return SkyCoord(positions, unit=(u.degree, u.degree))
+    if with_flux:
+        return SkyCoord(positions, unit=(u.degree, u.degree)), fluxes
+    else:
+        return SkyCoord(positions, unit=(u.degree, u.degree))
 
 def crossmatch(sources, ref_sources):
     idx, d2d, d3d = sources.match_to_catalog_sky(ref_sources)
