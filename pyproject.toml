@@ -46,9 +46,21 @@ dev = [
   "jupyterlab",
   "ipympl",
   "ruff",
+  "pyright",
+  "isort",
 ]
 
 [project.urls]
 Homepage = "https://github.com/ovro-lwa/image-plane-correction"
 Repository = "https://github.com/ovro-lwa/image-plane-correction"
 Issues = "https://github.com/ovro-lwa/image-plane-correction/issues"
+
+[tool.pyright]
+include = ["src", "scripts"]
+
+[tool.isort]
+src_paths = ["src", "scripts"]
+
+[tool.ruff]
+include = ["src/*.py", "scripts/*.py"]
+extend-include = ["notebooks/*.ipynb"]

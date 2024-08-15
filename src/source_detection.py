@@ -18,7 +18,7 @@ logger.setLevel(logging.INFO)
 # Using a parameter save file to work around https://github.com/lofar-astron/PyBDSF/issues/232
 # returns a SkyCoord containing all of the identified source positions
 # Note, writes intermediate files to work_dir
-def identify_sources_bdsf(img, imwcs, work_dir, N=4096, min_flux=2.7):
+def identify_sources_bdsf(img, imwcs, work_dir, N=4096, min_flux=2.7) -> SkyCoord:
     logger.info(f"Identifying sources in {img} using pybdsf")
     params = {
         "filename": img,
@@ -52,12 +52,12 @@ def identify_sources_bdsf(img, imwcs, work_dir, N=4096, min_flux=2.7):
     positions = positions[~np.isnan(positions).any(axis=1)]
 
     # convert to astropy SkyCoord
-    sources = SkyCoord(positions, unit=(u.degree, u.degree))
+    sources = SkyCoord(positions, unit=(u.deg, u.deg))
 
     # filter out sources that are near the horizon (not within 70 deg of the center of the image)
     middle = imwcs.pixel_to_world(N // 2 - 1, N // 2 - 1)  # zero-indexed
     separations = sources.separation(middle)
-    filter_idxs = separations < 70 * u.degree
+    filter_idxs = separations < 70 * u.deg
     sources = sources[filter_idxs]
 
     return sources

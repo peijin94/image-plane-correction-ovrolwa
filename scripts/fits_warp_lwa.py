@@ -1,26 +1,22 @@
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy import wcs
-import astropy.units as u
 
 from scipy.interpolate import RBFInterpolator, CloughTocher2DInterpolator
 
-import matplotlib
-import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 
 import numpy as np
-import pandas as pd
 
 from multiprocess import Pool
 
 import argparse
 import logging
-import pickle
 import os
 import sys
 from time import time
 
+# TODO: remove relative imports
 from source_detection import identify_sources_bdsf
 from catalogs import reference_sources_nvss
 
@@ -36,7 +32,7 @@ IMAGE_SIZE = 4096 # assume 4096x4096 images (specific to LWA)
 # use half of the CPU cores available
 CPU_COUNT = max(1, os.cpu_count() // 2)
 
-def crossmatch(sources, ref_sources):
+def crossmatch(sources: SkyCoord, ref_sources: SkyCoord) -> SkyCoord:
     idx, d2d, d3d = sources.match_to_catalog_sky(ref_sources)
     return ref_sources[idx]
 
@@ -131,11 +127,11 @@ def image_plane_correction(img,
     logger.info(f"Found {len(sources)} sources")
 
     # we are using the NVSS catalog for reference sources
-    ref_sources = reference_sources_nvss(min_flux=100)
+    ref_sources, _ = reference_sources_nvss(min_flux=100)
     logger.info(f"Using {len(ref_sources)} reference sources")
 
     # cross-match the sources found in the image with the reference sources
-    logger.info(f"Crossmatching sources and reference sources")
+    logger.info("Crossmatching sources and reference sources")
     matched_ref_sources = crossmatch(sources, ref_sources)
     seps_before = sources.separation(matched_ref_sources)
     logger.info(f"Before correction: median separation of {np.median(seps_before).arcmin} arcmin")
@@ -149,25 +145,25 @@ def image_plane_correction(img,
 
     # learn an RBF model on the X and Y offsets independently
     # TODO: experiment with different parameters
-    logger.info(f"Computing RBF interpolation models")
+    logger.info("Computing RBF interpolation models")
     dxmodel = RBFInterpolator(sources_xy, diff[:, 0], kernel='linear', smoothing=smoothing, neighbors=neighbors)
     dymodel = RBFInterpolator(sources_xy, diff[:, 1], kernel='linear', smoothing=smoothing, neighbors=neighbors)
 
     # the interpolated x and y offsets for each pixel, in row-major order
-    logger.info(f"Computing offsets at every pixel")
+    logger.info("Computing offsets at every pixel")
     start = time()
     offsets = compute_offsets(dxmodel, dymodel)  # IMAGE_SIZE^2 x 2
     logger.info(f"Done computing offsets in {time() - start} seconds")
 
     # add the offset to each image index in the original image to move the pixel to a new location
-    logger.info(f"Computing interpolation model for warped pixels")
+    logger.info("Computing interpolation model for warped pixels")
     start = time()
     image_indices = np.indices((IMAGE_SIZE, IMAGE_SIZE)).swapaxes(0, 2)[:, :, ::-1].reshape((IMAGE_SIZE * IMAGE_SIZE, 2))
     interp = CloughTocher2DInterpolator(image_indices - offsets, np.ravel(image_data))
     logger.info(f"Done computing interpolation model in {time() - start} seconds")
 
     # compute interpolated image after applying offsets to each pixel
-    logger.info(f"Dewarping the original image")
+    logger.info("Dewarping the original image")
     start = time()
     dewarped = compute_interpolation(interp)
     logger.info(f"Done dewarping in {time() - start} seconds")
