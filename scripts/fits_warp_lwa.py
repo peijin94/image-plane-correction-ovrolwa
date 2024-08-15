@@ -1,16 +1,16 @@
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
-import astropy.units as u
 from astropy import wcs
+import astropy.units as u
 
 from scipy.interpolate import RBFInterpolator, CloughTocher2DInterpolator
 
 import matplotlib
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
+
 import numpy as np
 import pandas as pd
-import bdsf
 
 from multiprocess import Pool
 
@@ -21,82 +21,20 @@ import os
 import sys
 from time import time
 
+from source_detection import identify_sources_bdsf
+from catalogs import reference_sources_nvss
+
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(module)s:%(levelname)s:%(lineno)d %(message)s")
 logger.setLevel(logging.INFO)
 
 WORKING_DIR = "working"
 OUTPUT_DIR = "outputs"
-SAVEFILE_NAME = "parameters.sav"
 IMAGE_SIZE = 4096 # assume 4096x4096 images (specific to LWA)
 
 # use half of the CPU cores available
 CPU_COUNT = max(1, os.cpu_count() // 2)
-
-# use pybdsf to identify sources from the input image
-# using a parameter save file to work around https://github.com/lofar-astron/PyBDSF/issues/232
-def identify_sources_bdsf(img, imwcs, min_flux=2.7):
-    logger.info(f"Identifying sources in {img} using pybdsf")
-    params = {
-        "filename": img,
-        "outdir": WORKING_DIR,
-        "ncores": CPU_COUNT,
-        "mean_map": "const",
-        "thresh": "hard",
-        "thresh_isl": 100,
-        "thresh_pix": 5,
-    }
-    savefile = f"{WORKING_DIR}/{SAVEFILE_NAME}"
-    with open(savefile, 'wb') as f:
-        pickle.dump(params, f)
-        
-    result = bdsf.process_image(savefile, quiet=True)
-    # re-enable logging since pybdsf removes all existing logger handlers
-    logging.basicConfig(format="%(module)s:%(levelname)s:%(lineno)d %(message)s", force=True)
-
-    # take sources above a certain flux density
-    positions = np.array([src.posn_sky_centroid for src in result.sources if src.peak_flux_max > min_flux])
-    
-    # filter out positions that are NaN
-    positions = positions[~np.isnan(positions).any(axis=1)]
-
-    # convert to astropy SkyCoord
-    sources = SkyCoord(positions, unit=(u.degree, u.degree))
-    
-    # filter out sources that are near the horizon (not within 70 deg of the center of the image)
-    middle = imwcs.pixel_to_world(IMAGE_SIZE//2 - 1, IMAGE_SIZE//2 - 1)  # zero-indexed
-    separations = sources.separation(middle)
-    filter_idxs = separations < 70 * u.degree
-    sources = sources[filter_idxs]
-
-    return sources
-
-# Returns the coordinates of sources in the reference catalog with at least the minimum flux (in mJy)
-# The default value is 270 mJy since the NVSS catalog was observed at 1.4 GHz, the LWA testing images
-# were taken at ~60 MHz with a lower-bound of ~2.7 Jy, and we assume a spectral index of -0.7.
-def reference_sources_nvss(min_flux=270, with_flux=False):
-    nvss = pd.read_csv("nvss_trim.dat", sep='\s+')
-    sorted_nvss = nvss.sort_values(by=['f'])
-    
-    # cut off refernce sources below a certain flux density
-    sorted_nvss = sorted_nvss[sorted_nvss['f'] >= min_flux]
-
-    # get coordinates of each reference source
-    nvss_orig = sorted_nvss[["rah", "ram", "ras", "dd", "dm", "ds"]].iloc[:].to_numpy()
-
-    # get flux of each reference source in Jy
-    fluxes = sorted_nvss[["f"]].iloc[:].to_numpy().squeeze() / 1000
-    
-    # manually convert HMS:DMS into degrees
-    nvss_ra = 15 * nvss_orig[:, 0] + (15 / 60) * nvss_orig[:, 1] + (15 / 3600) * nvss_orig[:, 2]
-    nvss_dec = nvss_orig[:, 3] + (1/60) * nvss_orig[:, 4] + (1/3600) * nvss_orig[:, 5]
-    
-    positions = np.stack((nvss_ra, nvss_dec), axis=-1)
-    
-    if with_flux:
-        return SkyCoord(positions, unit=(u.degree, u.degree)), fluxes
-    else:
-        return SkyCoord(positions, unit=(u.degree, u.degree))
 
 def crossmatch(sources, ref_sources):
     idx, d2d, d3d = sources.match_to_catalog_sky(ref_sources)
@@ -188,7 +126,7 @@ def image_plane_correction(img,
 
     # identify sources from the image using pybdsf
     start = time()
-    sources = identify_sources_bdsf(img, imwcs)
+    sources = identify_sources_bdsf(img, imwcs, WORKING_DIR)
     logger.info(f"Done identifying sources in {time() - start} seconds")
     logger.info(f"Found {len(sources)} sources")
 
@@ -224,7 +162,7 @@ def image_plane_correction(img,
     # add the offset to each image index in the original image to move the pixel to a new location
     logger.info(f"Computing interpolation model for warped pixels")
     start = time()
-    image_indices = np.indices((4096, 4096)).swapaxes(0, 2)[:, :, ::-1].reshape((4096 * 4096, 2))
+    image_indices = np.indices((IMAGE_SIZE, IMAGE_SIZE)).swapaxes(0, 2)[:, :, ::-1].reshape((IMAGE_SIZE * IMAGE_SIZE, 2))
     interp = CloughTocher2DInterpolator(image_indices - offsets, np.ravel(image_data))
     logger.info(f"Done computing interpolation model in {time() - start} seconds")
 
@@ -240,7 +178,7 @@ def image_plane_correction(img,
 
     # re-compute sources in interpolated image
     start = time()
-    new_sources = identify_sources_bdsf(f"{WORKING_DIR}/temp.fits", imwcs)
+    new_sources = identify_sources_bdsf(f"{WORKING_DIR}/temp.fits", imwcs, WORKING_DIR)
     logger.info(f"Done identifying new sources in {time() - start} seconds")
 
     # compute source/reference separations in dewarped image
