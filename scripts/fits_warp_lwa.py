@@ -17,6 +17,8 @@ import sys
 from time import time
 
 # TODO: remove relative imports
+# from source_detection import identify_sources_bdsf
+# from catalogs import reference_sources_nvss
 from source_detection import identify_sources_bdsf
 from catalogs import reference_sources_nvss
 

@@ -1,11 +1,10 @@
-import bdsf
-import numpy as np
-
-from astropy.coordinates import SkyCoord
-import astropy.units as u
-
 import logging
 import pickle
+
+import astropy.units as u
+import bdsf
+import numpy as np
+from astropy.coordinates import SkyCoord
 
 SAVEFILE_NAME = "parameters.sav"
 
