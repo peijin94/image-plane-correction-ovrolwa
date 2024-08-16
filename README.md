@@ -18,7 +18,7 @@ This can be a bit of a pain, so I wrote down the installation steps that worked 
 All of the project dependencies (except for OpenCV) are specified in `pyproject.toml`.
 To install these dependencies along with the source code, enter the project directory and run `pip install .`.
 If you wish to run the notebooks in `notebooks/`, I would recommend using Jupyter Lab (which you can install along with the project dependencies with `pip install .[dev]`.
-For the sake of development, I would also recommend adding the `-e` flag to the pip commands above so that any changes made to the source code in this repository is immediately reflected by the scripts/notebooks (instead of requiring a "reinstall" of the package).
+For the sake of development, I would also recommend adding the `-e` flag to the pip commands above so that any changes made to the source code in this repository are immediately reflected by the scripts/notebooks (instead of requiring a "reinstall" of the package).
 
 For GPU acceleration, ensure that JAX is installed with [CUDA support](https://jax.readthedocs.io/en/latest/installation.html#installation).
-As mentioned previously OpenCV must be built from source for CUDA support and should be accessible as `cv2`.
+As mentioned previously, OpenCV must be built from source for CUDA support and should be accessible as `cv2` for the optical flow code to work properly.
