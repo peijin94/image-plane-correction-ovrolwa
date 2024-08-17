@@ -39,6 +39,9 @@ dependencies = [
   "scipy",
   "matplotlib",
   "multiprocess",
+  "jax",
+  "jaxtyping",
+  "interpax",
 ]
 
 [project.optional-dependencies]
@@ -48,6 +51,10 @@ dev = [
   "ruff",
   "pyright",
   "isort",
+]
+
+gpu = [
+  "jax[cuda12]"
 ]
 
 [project.urls]

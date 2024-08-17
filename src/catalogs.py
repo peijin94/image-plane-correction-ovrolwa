@@ -11,11 +11,11 @@ from astropy.coordinates import SkyCoord
 from jax.scipy.signal import convolve
 from jaxtyping import Array
 
-from src.flow import Flow
-from src.util import gkern
+from flow import Flow
+from util import gkern
 
-NVSS_CATALOG = "nvss_trim.dat"
-VLSSR_CATALOG = "vlssr_radecpeak.txt"
+NVSS_CATALOG = "/fastpool/zwhuang/catalogs/nvss_trim.dat"
+VLSSR_CATALOG = "/fastpool/zwhuang/catalogs/vlssr_radecpeak.txt"
 
 Catalog = Union[Literal["NVSS"], Literal["VLSSR"]]
 

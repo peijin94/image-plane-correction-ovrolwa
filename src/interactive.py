@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
-from src.util import indices
+from util import indices
 
 
 def plot_image(image, name="image", title="", vmin=0, vmax=1, **kwargs):
@@ -233,13 +233,18 @@ def toggle_offsets(
     )
 
 
-def sequence_images(images, name="seq", vmin=0, vmax=1, N=4096, **kwargs):
+def sequence_images(images, name="seq", titles=None, vmin=0, vmax=1, N=4096, **kwargs):
     plt.close(name)
     plt.figure(name)
     extent = (-0.5, N - 0.5, -0.5, N - 0.5)
     N = len(images)
 
     imgs = []
+
+    if titles is None:
+        titles = [f"Image {idx + 1}" for idx in range(N)]
+    else:
+        assert len(titles) == N, "Invalid number of titles provided"
 
     for i in range(N):
         img = plt.imshow(
@@ -265,7 +270,7 @@ def sequence_images(images, name="seq", vmin=0, vmax=1, N=4096, **kwargs):
             else:
                 imgs[i].set_visible(False)
 
-        plt.title(f"Image {idx+1}")
+        plt.title(titles[idx])
         plt.draw()
 
     def on_press(event):

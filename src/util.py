@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 from jaxtyping import Array
@@ -130,3 +131,72 @@ def gkern(l=5, sig=1.0):
     gauss = jnp.exp(-0.5 * jnp.square(ax) / jnp.square(sig))
     kernel = jnp.outer(gauss, gauss)
     return kernel / kernel.max()
+
+# ported to jax from from https://github.com/matplotlib/matplotlib/blob/v3.9.2/lib/matplotlib/colors.py#L2235
+@jax.jit
+def hsv_to_rgb(hsv: Array):
+    """
+    Convert HSV values to RGB.
+
+    Parameters
+    ----------
+    hsv : (..., 3) `jax.Array`
+       All values assumed to be in range [0, 1]
+
+    Returns
+    -------
+    (..., 3) `jax.Array`
+       Colors converted to RGB values in range [0, 1]
+    """
+    # check length of the last dimension, should be _some_ sort of rgb
+    if hsv.shape[-1] != 3:
+        raise ValueError("Last dimension of input array must be 3; "
+                         f"shape {hsv.shape} was found.")
+
+    in_shape = hsv.shape
+
+    h = hsv[..., 0]
+    s = hsv[..., 1]
+    v = hsv[..., 2]
+
+    r = jnp.zeros_like(h)
+    g = jnp.zeros_like(h)
+    b = jnp.zeros_like(h)
+
+    i = (h * 6.0).astype(jnp.int32)
+    f = (h * 6.0) - i
+    p = v * (1.0 - s)
+    q = v * (1.0 - s * f)
+    t = v * (1.0 - s * (1.0 - f))
+
+    r = r + jnp.where(i % 6 == 0, v, 0)
+    g = g + jnp.where(i % 6 == 0, t, 0)
+    b = b + jnp.where(i % 6 == 0, p, 0)
+
+    r = r + jnp.where(i % 6 == 1, q, 0)
+    g = g + jnp.where(i % 6 == 1, v, 0)
+    b = b + jnp.where(i % 6 == 1, p, 0)
+
+    r = r + jnp.where(i % 6 == 2, p, 0)
+    g = g + jnp.where(i % 6 == 2, v, 0)
+    b = b + jnp.where(i % 6 == 2, t, 0)
+
+    r = r + jnp.where(i % 6 == 3, p, 0)
+    g = g + jnp.where(i % 6 == 3, q, 0)
+    b = b + jnp.where(i % 6 == 3, v, 0)
+
+    r = r + jnp.where(i % 6 == 4, t, 0)
+    g = g + jnp.where(i % 6 == 4, p, 0)
+    b = b + jnp.where(i % 6 == 4, v, 0)
+
+    r = r + jnp.where(i % 6 == 5, v, 0)
+    g = g + jnp.where(i % 6 == 5, p, 0)
+    b = b + jnp.where(i % 6 == 5, q, 0)
+
+    r = r + jnp.where(i % 6 == 6, v, 0)
+    g = g + jnp.where(i % 6 == 6, v, 0)
+    b = b + jnp.where(i % 6 == 6, v, 0)
+
+    rgb = jnp.stack([r, g, b], axis=-1)
+
+    return rgb.reshape(in_shape)
