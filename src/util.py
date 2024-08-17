@@ -1,3 +1,5 @@
+"""Utility functions (mostly ported from other libraries to JAX)"""
+
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
@@ -132,6 +134,7 @@ def gkern(l=5, sig=1.0):
     kernel = jnp.outer(gauss, gauss)
     return kernel / kernel.max()
 
+
 # ported to jax from from https://github.com/matplotlib/matplotlib/blob/v3.9.2/lib/matplotlib/colors.py#L2235
 @jax.jit
 def hsv_to_rgb(hsv: Array):
@@ -150,8 +153,9 @@ def hsv_to_rgb(hsv: Array):
     """
     # check length of the last dimension, should be _some_ sort of rgb
     if hsv.shape[-1] != 3:
-        raise ValueError("Last dimension of input array must be 3; "
-                         f"shape {hsv.shape} was found.")
+        raise ValueError(
+            "Last dimension of input array must be 3; " f"shape {hsv.shape} was found."
+        )
 
     in_shape = hsv.shape
 
@@ -200,3 +204,72 @@ def hsv_to_rgb(hsv: Array):
     rgb = jnp.stack([r, g, b], axis=-1)
 
     return rgb.reshape(in_shape)
+
+
+# porting match_histograms to jax
+# https://github.com/scikit-image/scikit-image/blob/v0.24.0/skimage/exposure/histogram_matching.py#L33-L93
+def _match_cumulative_cdf(source, template):
+    """
+    Return modified source array so that the cumulative density function of
+    its values matches the cumulative density function of the template.
+    """
+    if source.dtype.kind == "u":
+        src_lookup = source.reshape(-1)
+        src_counts = jnp.bincount(src_lookup)
+        tmpl_counts = jnp.bincount(template.reshape(-1))
+
+        # omit values where the count was 0
+        tmpl_values = jnp.nonzero(tmpl_counts)[0]
+        tmpl_counts = tmpl_counts[tmpl_values]
+    else:
+        src_values, src_lookup, src_counts = jnp.unique(
+            source.reshape(-1), return_inverse=True, return_counts=True
+        )
+        tmpl_values, tmpl_counts = jnp.unique(template.reshape(-1), return_counts=True)
+
+    # calculate normalized quantiles for each array
+    src_quantiles = jnp.cumsum(src_counts) / source.size
+    tmpl_quantiles = jnp.cumsum(tmpl_counts) / template.size
+
+    interp_a_values = jnp.interp(src_quantiles, tmpl_quantiles, tmpl_values)
+    return interp_a_values[src_lookup].reshape(source.shape)
+
+
+def match_histograms(image, reference):
+    """Adjust an image so that its cumulative histogram matches that of another.
+
+    We assume the image only has one color channel (e.g. is greyscale).
+
+    Parameters
+    ----------
+    image : ndarray
+        Input image. Can be gray-scale or in color.
+    reference : ndarray
+        Image to match histogram of. Must have the same number of channels as
+        image.
+
+    Returns
+    -------
+    matched : ndarray
+        Transformed input image.
+
+    Raises
+    ------
+    ValueError
+        Thrown when the number of channels in the input image and the reference
+        differ.
+
+    References
+    ----------
+    .. [1] http://paulbourke.net/miscellaneous/equalisation/
+
+    """
+    if image.ndim != reference.ndim:
+        raise ValueError(
+            "Image and reference must have the same number " "of channels."
+        )
+
+    # _match_cumulative_cdf will always return float64 due to np.interp
+    matched = _match_cumulative_cdf(image, reference)
+
+    return matched

@@ -24,9 +24,14 @@ class Flow:
         self.direction = direction
 
     # warps an input single-channel image using bilinear interpolation
+    # this function should work on any vector-valued input (e.g. 3D matrices
+    # where the first two axes are x/y coordinates.
     def apply(self, image: Array):
         if self.direction == "backwards":
-            H, W = image.shape
+            if len(image.shape) == 2:
+                image = jnp.expand_dims(image, axis=-1)
+
+            H, W, C = image.shape
 
             # H*W query points, one for each pixel in warped image.
             # Offsets are given as as [dx, dy], while images are indexed [y, x], so we need to reverse the last axis of offsets.
@@ -42,11 +47,19 @@ class Flow:
                 extrap=0,
             )
 
-            return jnp.reshape(results, shape=(H, W))
+            return jnp.reshape(results, shape=image.shape).squeeze()
         else:
             raise NotImplementedError()
 
-    def to_rgb(self, mask=None):
+    # the flow that would result from applying the current flow and then other_flow
+    def compose(self, other_flow):
+        return Flow(other_flow.offsets + other_flow.apply(self.offsets))
+
+    @staticmethod
+    def zero(shape):
+        return Flow(jnp.zeros((shape[0], shape[1], 2)))
+
+    def to_rgb(self, mask=None, scale=None):
         """
         Can pass in a boolean mask of shape (H, W) in to ignore invalid areas in the image.
         """
@@ -59,7 +72,10 @@ class Flow:
         angle = (angle + jnp.pi) / (2 * jnp.pi)
         
         magnitude = jnp.sqrt(flow[:, :, 0]**2 + flow[:, :, 1]**2)
-        magnitude = magnitude / magnitude.max()
+        if scale is None:
+            magnitude = magnitude / magnitude.max()
+        else:
+            magnitude = magnitude / scale
 
         hsv = jnp.stack([
             angle,

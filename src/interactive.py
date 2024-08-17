@@ -262,7 +262,7 @@ def sequence_images(images, name="seq", titles=None, vmin=0, vmax=1, N=4096, **k
     idx = 0
 
     def show():
-        # plt.figure(name)
+        plt.figure(name)
         nonlocal idx  # grab idx from outer scope
         for i in range(N):
             if i == idx:
