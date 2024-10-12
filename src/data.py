@@ -13,7 +13,7 @@ def fits_image(path: str) -> Tuple[Array, wcs.WCS]:
     Reads a fits image at a given path, returning the contained image and wcs data.
     """
     image = fits.open(path)
-    image_data = jnp.array(image[0].data[0, 0, :, :])
+    image_data = jnp.array(image[0].data.squeeze())
     imwcs = wcs.WCS(image[0].header, naxis=2)
     image.close()
     return image_data, imwcs
