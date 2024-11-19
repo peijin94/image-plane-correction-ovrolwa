@@ -2,7 +2,7 @@ import astropy as ap
 from astropy import units as u
 from astropy.io import fits
 from astropy.time import Time
-from common import (
+from .common import (
     _compute_linear_world_values,
     _compute_velocity_values,
     _compute_world_sph_dims,
